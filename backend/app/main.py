@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from backend.app.config import settings
 from backend.app.db import Base, engine
 from backend.app.services.seed_service import seed_hardware_if_empty
+from backend.app.routes.hardware import router as hardware_router
 
 app = FastAPI(title=settings.app_name)
+app.include_router(hardware_router)
 
 app.add_middleware(
     CORSMiddleware,
