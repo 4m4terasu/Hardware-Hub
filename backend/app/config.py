@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     app_name: str = "Hardware Hub"
     app_env: str = "development"
     frontend_url: str = "http://localhost:5173"
+    database_url: str = "sqlite:///./hardware_hub.db"
 
     model_config = SettingsConfigDict(
         env_file=".env",
