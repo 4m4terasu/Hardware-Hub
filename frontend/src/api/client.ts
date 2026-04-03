@@ -12,8 +12,38 @@ export type HardwareListItem = {
   history_text: string | null;
 };
 
-export async function getHardware(): Promise<HardwareListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/api/hardware`, {
+export type HardwareQueryParams = {
+  status?: string;
+  brand?: string;
+  sortBy?: "id" | "name" | "brand" | "purchase_date_raw" | "status_raw";
+  sortDir?: "asc" | "desc";
+};
+
+export async function getHardware(
+  params: HardwareQueryParams = {},
+): Promise<HardwareListItem[]> {
+  const searchParams = new URLSearchParams();
+
+  if (params.status) {
+    searchParams.set("status", params.status);
+  }
+
+  if (params.brand) {
+    searchParams.set("brand", params.brand);
+  }
+
+  if (params.sortBy) {
+    searchParams.set("sort_by", params.sortBy);
+  }
+
+  if (params.sortDir) {
+    searchParams.set("sort_dir", params.sortDir);
+  }
+
+  const queryString = searchParams.toString();
+  const url = `${API_BASE_URL}/api/hardware${queryString ? `?${queryString}` : ""}`;
+
+  const response = await fetch(url, {
     credentials: "include",
   });
 
