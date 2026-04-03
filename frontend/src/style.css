@@ -294,3 +294,53 @@ code {
     border-right-color: var(--border);
   }
 }
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.secondary-button {
+  padding: 0.75rem 1rem;
+  border: 1px solid #cfe0d9;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #102018;
+  font-weight: 600;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 0.95rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid #e3ece8;
+}
+
+.inventory-table th {
+  font-size: 0.9rem;
+  color: #466257;
+  font-weight: 700;
+  background: #f8fbfa;
+}
+
+.state-text {
+  margin-top: 1rem;
+  color: #466257;
+}
+
+.error-text {
+  color: #b42318;
+}
