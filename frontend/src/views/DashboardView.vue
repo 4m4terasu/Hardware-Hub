@@ -1,14 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { getHardware, type HardwareListItem } from "../api/client";
+import { useRouter } from "vue-router";
+import {
+  clearAccessToken,
+  getCurrentUser,
+  getHardware,
+  type AuthUser,
+  type HardwareListItem,
+} from "../api/client";
 
+const router = useRouter();
+
+const currentUser = ref<AuthUser | null>(null);
 const hardwareItems = ref<HardwareListItem[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
 
 const selectedStatus = ref("");
 const selectedBrand = ref("");
-const selectedSortBy = ref<"id" | "name" | "brand" | "purchase_date_raw" | "status_raw">("id");
+const selectedSortBy = ref<
+  "id" | "name" | "brand" | "purchase_date_raw" | "status_raw"
+>("id");
 const selectedSortDir = ref<"asc" | "desc">("asc");
 
 const availableStatuses = ["Available", "In Use", "Repair"];
@@ -23,6 +35,11 @@ const availableBrands = computed(() => {
   return Array.from(uniqueBrands).sort((a, b) => a.localeCompare(b));
 });
 
+async function handleUnauthorized() {
+  clearAccessToken();
+  await router.push("/login");
+}
+
 async function loadHardware() {
   isLoading.value = true;
   errorMessage.value = "";
@@ -35,24 +52,47 @@ async function loadHardware() {
       sortDir: selectedSortDir.value,
     });
   } catch (error) {
-    errorMessage.value =
+    const message =
       error instanceof Error
         ? error.message
         : "Failed to load hardware inventory.";
+
+    if (message.includes("401")) {
+      await handleUnauthorized();
+      return;
+    }
+
+    errorMessage.value = message;
   } finally {
     isLoading.value = false;
   }
 }
 
+async function initializeDashboard() {
+  try {
+    currentUser.value = await getCurrentUser();
+    await loadHardware();
+  } catch {
+    await handleUnauthorized();
+  }
+}
+
+async function handleLogout() {
+  clearAccessToken();
+  await router.push("/login");
+}
+
 watch(
   [selectedStatus, selectedBrand, selectedSortBy, selectedSortDir],
   () => {
-    void loadHardware();
+    if (currentUser.value) {
+      void loadHardware();
+    }
   },
 );
 
 onMounted(() => {
-  void loadHardware();
+  void initializeDashboard();
 });
 </script>
 
@@ -62,11 +102,16 @@ onMounted(() => {
       <div>
         <p class="eyebrow">Dashboard</p>
         <h1>Hardware Hub</h1>
+        <p v-if="currentUser" class="muted">
+          Signed in as {{ currentUser.email }}
+        </p>
       </div>
 
       <nav class="nav">
-        <RouterLink to="/admin">Admin</RouterLink>
-        <RouterLink to="/login">Logout</RouterLink>
+        <RouterLink v-if="currentUser?.is_admin" to="/admin">Admin</RouterLink>
+        <button type="button" class="nav-button" @click="handleLogout">
+          Logout
+        </button>
       </nav>
     </header>
 
