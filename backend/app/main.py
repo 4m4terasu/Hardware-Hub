@@ -12,6 +12,8 @@ from backend.app.models.user import User  # noqa: F401
 
 from backend.app.routes.hardware import router as hardware_router
 from backend.app.routes.auth import router as auth_router
+from backend.app.routes.admin import router as admin_router
+
 from backend.app.services.seed_service import seed_hardware_if_empty
 from backend.app.services.user_seed_service import seed_admin_if_missing
 
@@ -51,3 +53,4 @@ def health() -> dict[str, str]:
 
 app.include_router(hardware_router)
 app.include_router(auth_router)
+app.include_router(admin_router)

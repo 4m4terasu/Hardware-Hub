@@ -5,10 +5,15 @@ from sqlalchemy import asc, desc, select
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
+from backend.app.dependencies.auth import get_current_user
 from backend.app.models.hardware import Hardware
 from backend.app.schemas.hardware import HardwareListItem
 
-router = APIRouter(prefix="/api/hardware", tags=["hardware"])
+router = APIRouter(
+    prefix="/api/hardware",
+    tags=["hardware"],
+    dependencies=[Depends(get_current_user)],
+)
 
 SortBy = Literal["id", "name", "brand", "purchase_date_raw", "status_raw"]
 SortDir = Literal["asc", "desc"]
