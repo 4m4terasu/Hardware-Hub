@@ -7,6 +7,13 @@ class Settings(BaseSettings):
     frontend_url: str = "http://localhost:5173"
     database_url: str = "sqlite:///./hardware_hub.db"
 
+    jwt_secret_key: str = "change-me-in-local-env"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+
+    bootstrap_admin_email: str = "admin@booksy.com"
+    bootstrap_admin_password: str = "Admin123!"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
