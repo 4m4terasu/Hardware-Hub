@@ -302,3 +302,12 @@ textarea {
   color: #ffffff;
   font-weight: 600;
 }
+
+.table-actions button {
+  padding: 0.65rem 0.85rem;
+}
+
+.table-empty-action {
+  color: #5e7469;
+  font-weight: 600;
+}

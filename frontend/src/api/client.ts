@@ -240,3 +240,33 @@ export async function deleteAdminHardware(hardwareId: number): Promise<void> {
     );
   }
 }
+
+export async function rentHardware(hardwareId: number): Promise<HardwareListItem> {
+  const response = await apiFetch(`/api/hardware/${hardwareId}/rent`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to rent hardware item."),
+    );
+  }
+
+  return response.json() as Promise<HardwareListItem>;
+}
+
+export async function returnHardware(
+  hardwareId: number,
+): Promise<HardwareListItem> {
+  const response = await apiFetch(`/api/hardware/${hardwareId}/return`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to return hardware item."),
+    );
+  }
+
+  return response.json() as Promise<HardwareListItem>;
+}

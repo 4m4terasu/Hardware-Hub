@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import {
   clearAccessToken,
   getCurrentUser,
   getHardware,
+  rentHardware,
+  returnHardware,
   type AuthUser,
   type HardwareListItem,
 } from "../api/client";
@@ -15,6 +17,8 @@ const currentUser = ref<AuthUser | null>(null);
 const hardwareItems = ref<HardwareListItem[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
+const successMessage = ref("");
+const activeHardwareActionId = ref<number | null>(null);
 
 const selectedStatus = ref("");
 const selectedBrand = ref("");
@@ -35,6 +39,31 @@ const availableBrands = computed(() => {
   return Array.from(uniqueBrands).sort((a, b) => a.localeCompare(b));
 });
 
+function clearMessages() {
+  successMessage.value = "";
+  errorMessage.value = "";
+}
+
+async function scrollToTopForFeedback() {
+  await nextTick();
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}
+
+function isAuthErrorMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes("not authenticated") ||
+    normalizedMessage.includes("authentication") ||
+    normalizedMessage.includes("invalid or expired authentication token") ||
+    normalizedMessage.includes("authenticated user was not found")
+  );
+}
+
 async function handleUnauthorized() {
   clearAccessToken();
   await router.push("/login");
@@ -42,7 +71,6 @@ async function handleUnauthorized() {
 
 async function loadHardware() {
   isLoading.value = true;
-  errorMessage.value = "";
 
   try {
     hardwareItems.value = await getHardware({
@@ -57,7 +85,7 @@ async function loadHardware() {
         ? error.message
         : "Failed to load hardware inventory.";
 
-    if (message.includes("401")) {
+    if (isAuthErrorMessage(message)) {
       await handleUnauthorized();
       return;
     }
@@ -80,6 +108,72 @@ async function initializeDashboard() {
 async function handleLogout() {
   clearAccessToken();
   await router.push("/login");
+}
+
+function canRentItem(item: HardwareListItem): boolean {
+  return item.status_raw === "Available";
+}
+
+function canReturnItem(item: HardwareListItem): boolean {
+  return (
+    item.status_raw === "In Use" &&
+    item.assigned_to === currentUser.value?.email
+  );
+}
+
+async function handleRent(item: HardwareListItem) {
+  clearMessages();
+  activeHardwareActionId.value = item.id;
+
+  try {
+    const updatedItem = await rentHardware(item.id);
+    successMessage.value = `You rented ${updatedItem.name}.`;
+    await loadHardware();
+    await scrollToTopForFeedback();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to rent hardware item.";
+
+    if (isAuthErrorMessage(message)) {
+      await handleUnauthorized();
+      return;
+    }
+
+    errorMessage.value = message;
+    await scrollToTopForFeedback();
+  } finally {
+    activeHardwareActionId.value = null;
+  }
+}
+
+async function handleReturn(item: HardwareListItem) {
+  clearMessages();
+  activeHardwareActionId.value = item.id;
+
+  try {
+    const updatedItem = await returnHardware(item.id);
+    successMessage.value = `You returned ${updatedItem.name}.`;
+    await loadHardware();
+    await scrollToTopForFeedback();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to return hardware item.";
+
+    if (isAuthErrorMessage(message)) {
+      await handleUnauthorized();
+      return;
+    }
+
+    errorMessage.value = message;
+    await scrollToTopForFeedback();
+  } finally {
+    activeHardwareActionId.value = null;
+  }
+}
+
+async function handleRefresh() {
+  clearMessages();
+  await loadHardware();
 }
 
 watch(
@@ -115,14 +209,24 @@ onMounted(() => {
       </nav>
     </header>
 
+    <p v-if="successMessage" class="feedback-banner feedback-success">
+      {{ successMessage }}
+    </p>
+
+    <p v-if="errorMessage" class="feedback-banner feedback-error">
+      {{ errorMessage }}
+    </p>
+
     <section class="panel">
       <div class="panel-header">
         <div>
           <h2>Inventory</h2>
-          <p class="muted">Read-only dashboard connected to the backend API.</p>
+          <p class="muted">
+            Browse available gear and rent or return items from the dashboard.
+          </p>
         </div>
 
-        <button type="button" class="secondary-button" @click="loadHardware">
+        <button type="button" class="secondary-button" @click="handleRefresh">
           Refresh
         </button>
       </div>
@@ -169,9 +273,6 @@ onMounted(() => {
       </div>
 
       <p v-if="isLoading" class="state-text">Loading inventory...</p>
-      <p v-else-if="errorMessage" class="state-text error-text">
-        {{ errorMessage }}
-      </p>
 
       <div v-else class="table-wrapper">
         <table class="inventory-table">
@@ -181,14 +282,42 @@ onMounted(() => {
               <th>Brand</th>
               <th>Purchase Date</th>
               <th>Status</th>
+              <th>Assigned To</th>
+              <th>Action</th>
             </tr>
           </thead>
+
           <tbody>
             <tr v-for="item in hardwareItems" :key="item.id">
               <td>{{ item.name }}</td>
               <td>{{ item.brand || "—" }}</td>
               <td>{{ item.purchase_date_raw || "—" }}</td>
               <td>{{ item.status_raw || "—" }}</td>
+              <td>{{ item.assigned_to || "—" }}</td>
+              <td>
+                <div class="table-actions">
+                  <button
+                    v-if="canRentItem(item)"
+                    type="button"
+                    :disabled="activeHardwareActionId === item.id"
+                    @click="handleRent(item)"
+                  >
+                    {{ activeHardwareActionId === item.id ? "Working..." : "Rent" }}
+                  </button>
+
+                  <button
+                    v-else-if="canReturnItem(item)"
+                    type="button"
+                    class="secondary-button"
+                    :disabled="activeHardwareActionId === item.id"
+                    @click="handleReturn(item)"
+                  >
+                    {{ activeHardwareActionId === item.id ? "Working..." : "Return" }}
+                  </button>
+
+                  <span v-else class="table-empty-action">—</span>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
