@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HardwareListItem(BaseModel):
@@ -12,3 +12,12 @@ class HardwareListItem(BaseModel):
     history_text: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+class HardwareCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    brand: str | None = Field(default=None, max_length=255)
+    purchase_date_raw: str | None = Field(default=None, max_length=50)
+    notes: str | None = None
+    history_text: str | None = None
+
+    model_config = ConfigDict(str_strip_whitespace=True)
