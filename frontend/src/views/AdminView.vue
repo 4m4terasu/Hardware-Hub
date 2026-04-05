@@ -257,13 +257,17 @@ onMounted(() => {
           </div>
         </div>
 
-        <form class="stack" @submit.prevent="handleCreateUser">
+        <form class="stack" autocomplete="off" @submit.prevent="handleCreateUser">
           <label class="form-field">
             <span>Email</span>
             <input
               v-model="userEmail"
+              name="admin-create-user-email"
               type="email"
               placeholder="new.user@booksy.com"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
               required
             />
           </label>
@@ -272,8 +276,10 @@ onMounted(() => {
             <span>Password</span>
             <input
               v-model="userPassword"
+              name="admin-create-user-password"
               type="password"
               placeholder="Enter a temporary password"
+              autocomplete="new-password"
               required
             />
           </label>
@@ -297,13 +303,15 @@ onMounted(() => {
           </div>
         </div>
 
-        <form class="stack" @submit.prevent="handleCreateHardware">
+        <form class="stack" autocomplete="off" @submit.prevent="handleCreateHardware">
           <label class="form-field">
             <span>Name</span>
             <input
               v-model="hardwareName"
+              name="admin-create-hardware-name"
               type="text"
               placeholder="MacBook Pro 14"
+              autocomplete="off"
               required
             />
           </label>
@@ -312,8 +320,10 @@ onMounted(() => {
             <span>Brand</span>
             <input
               v-model="hardwareBrand"
+              name="admin-create-hardware-brand"
               type="text"
               placeholder="Apple"
+              autocomplete="off"
             />
           </label>
 
@@ -321,7 +331,9 @@ onMounted(() => {
             <span>Purchase Date</span>
             <input
               v-model="hardwarePurchaseDateRaw"
+              name="admin-create-hardware-date"
               type="date"
+              autocomplete="off"
             />
           </label>
 
@@ -329,7 +341,9 @@ onMounted(() => {
             <span>Notes</span>
             <textarea
               v-model="hardwareNotes"
+              name="admin-create-hardware-notes"
               placeholder="Optional notes for admins"
+              autocomplete="off"
             />
           </label>
 
@@ -337,7 +351,9 @@ onMounted(() => {
             <span>History</span>
             <textarea
               v-model="hardwareHistoryText"
+              name="admin-create-hardware-history"
               placeholder="Optional history or context"
+              autocomplete="off"
             />
           </label>
 
