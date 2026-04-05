@@ -239,3 +239,66 @@ button:disabled {
   color: #102018;
   font-weight: 600;
 }
+
+textarea {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #cfe0d9;
+  background: #fbfefd;
+  font: inherit;
+  resize: vertical;
+  min-height: 108px;
+}
+
+.feedback-banner {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+
+.feedback-success {
+  background: #ecfdf3;
+  border-color: #abefc6;
+  color: #067647;
+}
+
+.feedback-error {
+  background: #fef3f2;
+  border-color: #fecdca;
+  color: #b42318;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #466257;
+  font-weight: 600;
+}
+
+.checkbox-field input {
+  width: auto;
+  margin: 0;
+}
+
+.table-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.table-actions .secondary-button,
+.table-actions .danger-button {
+  padding: 0.65rem 0.85rem;
+}
+
+.danger-button {
+  border: none;
+  border-radius: 12px;
+  background: #d92d20;
+  color: #ffffff;
+  font-weight: 600;
+}

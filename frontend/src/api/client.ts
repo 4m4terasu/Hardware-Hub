@@ -19,6 +19,20 @@ export type AuthUser = {
   is_admin: boolean;
 };
 
+export type CreateUserRequest = {
+  email: string;
+  password: string;
+  is_admin: boolean;
+};
+
+export type CreateHardwareRequest = {
+  name: string;
+  brand?: string | null;
+  purchase_date_raw?: string | null;
+  notes?: string | null;
+  history_text?: string | null;
+};
+
 export type HardwareListItem = {
   id: number;
   name: string;
@@ -47,6 +61,15 @@ export function setAccessToken(token: string): void {
 
 export function clearAccessToken(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+function normalizeOptionalText(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 async function readErrorMessage(
@@ -146,4 +169,74 @@ export async function getHardware(
   }
 
   return response.json() as Promise<HardwareListItem[]>;
+}
+
+export async function createAdminUser(
+  payload: CreateUserRequest,
+): Promise<AuthUser> {
+  const response = await apiFetch("/api/admin/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to create user account."),
+    );
+  }
+
+  return response.json() as Promise<AuthUser>;
+}
+
+export async function createAdminHardware(
+  payload: CreateHardwareRequest,
+): Promise<HardwareListItem> {
+  const normalizedPayload: CreateHardwareRequest = {
+    name: payload.name.trim(),
+    brand: normalizeOptionalText(payload.brand),
+    purchase_date_raw: normalizeOptionalText(payload.purchase_date_raw),
+    notes: normalizeOptionalText(payload.notes),
+    history_text: normalizeOptionalText(payload.history_text),
+  };
+
+  const response = await apiFetch("/api/admin/hardware", {
+    method: "POST",
+    body: JSON.stringify(normalizedPayload),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to create hardware item."),
+    );
+  }
+
+  return response.json() as Promise<HardwareListItem>;
+}
+
+export async function toggleAdminRepairStatus(
+  hardwareId: number,
+): Promise<HardwareListItem> {
+  const response = await apiFetch(`/api/admin/hardware/${hardwareId}/toggle-repair`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to toggle repair status."),
+    );
+  }
+
+  return response.json() as Promise<HardwareListItem>;
+}
+
+export async function deleteAdminHardware(hardwareId: number): Promise<void> {
+  const response = await apiFetch(`/api/admin/hardware/${hardwareId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to delete hardware item."),
+    );
+  }
 }
