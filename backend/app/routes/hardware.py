@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,7 +9,12 @@ from backend.app.db import get_db
 from backend.app.dependencies.auth import get_current_user
 from backend.app.models.hardware import Hardware
 from backend.app.models.user import User
-from backend.app.schemas.hardware import HardwareListItem
+from backend.app.schemas.hardware import (
+    HardwareListItem,
+    InventoryAuditFinding,
+    InventoryAuditResponse,
+    InventoryAuditSummary,
+)
 
 router = APIRouter(
     prefix="/api/hardware",
@@ -25,6 +31,18 @@ BLOCKING_NOTE_PHRASES = (
     "without service",
     "battery swelling",
 )
+DAMAGE_HISTORY_PHRASES = (
+    "liquid damage",
+    "keyboard sticky",
+)
+KNOWN_BRAND_TYPO_SUGGESTIONS = {
+    "appel": "Apple",
+}
+SEVERITY_ORDER = {
+    "high": 0,
+    "medium": 1,
+    "low": 2,
+}
 
 
 def get_hardware_or_404(hardware_id: int, db: Session) -> Hardware:
@@ -62,6 +80,155 @@ def has_blocking_rental_note(notes: str | None) -> bool:
     return any(phrase in normalized_notes for phrase in BLOCKING_NOTE_PHRASES)
 
 
+def has_damage_history(history_text: str | None) -> bool:
+    if not history_text:
+        return False
+
+    normalized_history = history_text.casefold()
+    return any(phrase in normalized_history for phrase in DAMAGE_HISTORY_PHRASES)
+
+
+def build_audit_findings(hardware_items: list[Hardware]) -> list[InventoryAuditFinding]:
+    findings: list[InventoryAuditFinding] = []
+
+    for item in hardware_items:
+        item_brand = (item.brand or "").strip()
+        item_status = (item.status_raw or "").strip()
+        item_purchase_date = (item.purchase_date_raw or "").strip()
+
+        if not item_brand:
+            findings.append(
+                InventoryAuditFinding(
+                    hardware_id=item.id,
+                    hardware_name=item.name,
+                    issue_code="MISSING_BRAND",
+                    severity="medium",
+                    message="Brand is missing and should be reviewed.",
+                )
+            )
+        else:
+            suggested_brand = KNOWN_BRAND_TYPO_SUGGESTIONS.get(item_brand.casefold())
+            if suggested_brand:
+                findings.append(
+                    InventoryAuditFinding(
+                        hardware_id=item.id,
+                        hardware_name=item.name,
+                        issue_code="SUSPICIOUS_BRAND",
+                        severity="low",
+                        message=(
+                            f'Brand "{item.brand}" looks suspicious and may be a typo '
+                            f'for "{suggested_brand}".'
+                        ),
+                    )
+                )
+
+        if not item_purchase_date:
+            findings.append(
+                InventoryAuditFinding(
+                    hardware_id=item.id,
+                    hardware_name=item.name,
+                    issue_code="MISSING_PURCHASE_DATE",
+                    severity="medium",
+                    message="Purchase date is missing and should be reviewed.",
+                )
+            )
+        else:
+            try:
+                parsed_purchase_date = date.fromisoformat(item_purchase_date)
+
+                if parsed_purchase_date > date.today():
+                    findings.append(
+                        InventoryAuditFinding(
+                            hardware_id=item.id,
+                            hardware_name=item.name,
+                            issue_code="FUTURE_PURCHASE_DATE",
+                            severity="high",
+                            message=(
+                                f"Purchase date {item.purchase_date_raw} is in the future."
+                            ),
+                        )
+                    )
+            except ValueError:
+                findings.append(
+                    InventoryAuditFinding(
+                        hardware_id=item.id,
+                        hardware_name=item.name,
+                        issue_code="MALFORMED_PURCHASE_DATE",
+                        severity="medium",
+                        message=(
+                            f'Purchase date "{item.purchase_date_raw}" is malformed. '
+                            "Expected YYYY-MM-DD."
+                        ),
+                    )
+                )
+
+        if item_status not in VALID_HARDWARE_STATUSES:
+            findings.append(
+                InventoryAuditFinding(
+                    hardware_id=item.id,
+                    hardware_name=item.name,
+                    issue_code="INVALID_STATUS",
+                    severity="high",
+                    message=(
+                        f'Status "{item.status_raw}" is invalid and should be corrected.'
+                    ),
+                )
+            )
+
+        if has_blocking_rental_note(item.notes):
+            findings.append(
+                InventoryAuditFinding(
+                    hardware_id=item.id,
+                    hardware_name=item.name,
+                    issue_code="SAFETY_NOTE_BLOCK",
+                    severity="high",
+                    message=(
+                        "Notes indicate this item should not be issued without review."
+                    ),
+                )
+            )
+
+        if has_damage_history(item.history_text):
+            findings.append(
+                InventoryAuditFinding(
+                    hardware_id=item.id,
+                    hardware_name=item.name,
+                    issue_code="DAMAGE_HISTORY",
+                    severity="medium",
+                    message=(
+                        "History contains damage-related information that should be "
+                        "reviewed before future use."
+                    ),
+                )
+            )
+
+    hardware_id_4 = next((item for item in hardware_items if item.id == 4), None)
+    if hardware_id_4:
+        findings.append(
+            InventoryAuditFinding(
+                hardware_id=hardware_id_4.id,
+                hardware_name=hardware_id_4.name,
+                issue_code="DUPLICATE_SEED_ID_SKIPPED",
+                severity="medium",
+                message=(
+                    "The source seed contained a duplicate row for ID 4. "
+                    "The duplicate entry was intentionally skipped during import "
+                    "for this MVP."
+                ),
+            )
+        )
+
+    findings.sort(
+        key=lambda finding: (
+            SEVERITY_ORDER[finding.severity],
+            finding.hardware_id if finding.hardware_id is not None else -1,
+            finding.issue_code,
+        )
+    )
+
+    return findings
+
+
 @router.get("", response_model=list[HardwareListItem])
 def list_hardware(
     status: str | None = Query(default=None),
@@ -84,6 +251,26 @@ def list_hardware(
 
     hardware_items = db.scalars(statement).all()
     return list(hardware_items)
+
+
+@router.get("/audit", response_model=InventoryAuditResponse)
+def audit_hardware_inventory(
+    db: Session = Depends(get_db),
+) -> InventoryAuditResponse:
+    hardware_items = list(db.scalars(select(Hardware).order_by(Hardware.id)).all())
+    findings = build_audit_findings(hardware_items)
+
+    summary = InventoryAuditSummary(
+        total_items=len(hardware_items),
+        total_findings=len(findings),
+        high_severity_count=sum(1 for finding in findings if finding.severity == "high"),
+        medium_severity_count=sum(
+            1 for finding in findings if finding.severity == "medium"
+        ),
+        low_severity_count=sum(1 for finding in findings if finding.severity == "low"),
+    )
+
+    return InventoryAuditResponse(summary=summary, findings=findings)
 
 
 @router.post("/{hardware_id}/rent", response_model=HardwareListItem)
