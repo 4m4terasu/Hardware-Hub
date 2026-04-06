@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str = "admin@booksy.com"
     bootstrap_admin_password: str = "Admin123!"
 
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

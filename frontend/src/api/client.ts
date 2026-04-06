@@ -51,6 +51,38 @@ export type HardwareQueryParams = {
   sortDir?: "asc" | "desc";
 };
 
+export type InventoryAuditFinding = {
+  hardware_id: number | null;
+  hardware_name: string | null;
+  issue_code: string;
+  severity: "high" | "medium" | "low";
+  message: string;
+};
+
+export type InventoryAuditSummary = {
+  total_items: number;
+  total_findings: number;
+  high_severity_count: number;
+  medium_severity_count: number;
+  low_severity_count: number;
+};
+
+export type InventoryAuditAiSummary = {
+  provider: string | null;
+  model: string | null;
+  fallback_used: boolean;
+  risk_level: "high" | "medium" | "low";
+  summary_text: string;
+  priority_actions: string[];
+  error_message: string | null;
+};
+
+export type InventoryAuditReport = {
+  summary: InventoryAuditSummary;
+  findings: InventoryAuditFinding[];
+  ai_summary: InventoryAuditAiSummary;
+};
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
@@ -269,4 +301,16 @@ export async function returnHardware(
   }
 
   return response.json() as Promise<HardwareListItem>;
+}
+
+export async function getInventoryAuditReport(): Promise<InventoryAuditReport> {
+  const response = await apiFetch("/api/hardware/audit/report");
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to load inventory audit report."),
+    );
+  }
+
+  return response.json() as Promise<InventoryAuditReport>;
 }

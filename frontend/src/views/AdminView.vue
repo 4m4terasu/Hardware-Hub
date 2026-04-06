@@ -8,20 +8,24 @@ import {
   deleteAdminHardware,
   getCurrentUser,
   getHardware,
+  getInventoryAuditReport,
   toggleAdminRepairStatus,
   type AuthUser,
   type HardwareListItem,
+  type InventoryAuditReport,
 } from "../api/client";
 
 const router = useRouter();
 
 const currentUser = ref<AuthUser | null>(null);
 const hardwareItems = ref<HardwareListItem[]>([]);
+const auditReport = ref<InventoryAuditReport | null>(null);
 
 const isCheckingAccess = ref(true);
 const isLoadingHardware = ref(false);
 const isCreatingUser = ref(false);
 const isCreatingHardware = ref(false);
+const isLoadingAudit = ref(false);
 const activeHardwareActionId = ref<number | null>(null);
 
 const successMessage = ref("");
@@ -61,6 +65,17 @@ async function handleUnauthorized() {
   await router.replace("/login");
 }
 
+function isAuthErrorMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes("not authenticated") ||
+    normalizedMessage.includes("authentication") ||
+    normalizedMessage.includes("invalid or expired authentication token") ||
+    normalizedMessage.includes("authenticated user was not found")
+  );
+}
+
 async function loadHardware() {
   isLoadingHardware.value = true;
 
@@ -75,7 +90,7 @@ async function loadHardware() {
         ? error.message
         : "Failed to load hardware inventory.";
 
-    if (message.toLowerCase().includes("authentication")) {
+    if (isAuthErrorMessage(message)) {
       await handleUnauthorized();
       return;
     }
@@ -195,6 +210,36 @@ async function handleDeleteHardware(item: HardwareListItem) {
 async function handleRefresh() {
   clearMessages();
   await loadHardware();
+}
+
+async function handleRunAudit() {
+  clearMessages();
+  isLoadingAudit.value = true;
+
+  try {
+    auditReport.value = await getInventoryAuditReport();
+
+    if (auditReport.value.ai_summary.fallback_used) {
+      successMessage.value =
+        "Deterministic audit loaded. Gemini fallback was used for the summary.";
+    } else {
+      successMessage.value = "Inventory audit report generated successfully.";
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to load inventory audit report.";
+
+    if (isAuthErrorMessage(message)) {
+      await handleUnauthorized();
+      return;
+    }
+
+    errorMessage.value = message;
+  } finally {
+    isLoadingAudit.value = false;
+  }
 }
 
 async function handleLogout() {
@@ -362,6 +407,136 @@ onMounted(() => {
           </button>
         </form>
       </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>Inventory Audit Report</h2>
+          <p class="muted">
+            Run the deterministic audit and let Gemini summarize the findings.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="secondary-button"
+          :disabled="isLoadingAudit"
+          @click="handleRunAudit"
+        >
+          {{ isLoadingAudit ? "Running audit..." : "Run Audit Report" }}
+        </button>
+      </div>
+
+      <div v-if="auditReport" class="audit-layout">
+        <article class="audit-card">
+          <h3>Deterministic Summary</h3>
+          <div class="audit-summary-grid">
+            <div class="audit-metric">
+              <span class="audit-metric-label">Items</span>
+              <strong>{{ auditReport.summary.total_items }}</strong>
+            </div>
+            <div class="audit-metric">
+              <span class="audit-metric-label">Findings</span>
+              <strong>{{ auditReport.summary.total_findings }}</strong>
+            </div>
+            <div class="audit-metric">
+              <span class="audit-metric-label">High</span>
+              <strong>{{ auditReport.summary.high_severity_count }}</strong>
+            </div>
+            <div class="audit-metric">
+              <span class="audit-metric-label">Medium</span>
+              <strong>{{ auditReport.summary.medium_severity_count }}</strong>
+            </div>
+            <div class="audit-metric">
+              <span class="audit-metric-label">Low</span>
+              <strong>{{ auditReport.summary.low_severity_count }}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="audit-card">
+          <div class="audit-card-header">
+            <div>
+              <h3>Gemini Summary</h3>
+              <p class="muted">
+                Provider: {{ auditReport.ai_summary.provider || "gemini" }}
+                <span v-if="auditReport.ai_summary.model">
+                  · Model: {{ auditReport.ai_summary.model }}
+                </span>
+              </p>
+            </div>
+
+            <span
+              class="audit-risk-badge"
+              :class="`risk-${auditReport.ai_summary.risk_level}`"
+            >
+              {{ auditReport.ai_summary.risk_level }} risk
+            </span>
+          </div>
+
+          <p
+            v-if="auditReport.ai_summary.fallback_used"
+            class="audit-fallback-note"
+          >
+            Gemini fallback was used. Deterministic findings are still valid.
+          </p>
+
+          <p class="audit-summary-text">
+            {{ auditReport.ai_summary.summary_text }}
+          </p>
+
+          <div>
+            <h4>Priority Actions</h4>
+            <ul class="audit-actions-list">
+              <li
+                v-for="action in auditReport.ai_summary.priority_actions"
+                :key="action"
+              >
+                {{ action }}
+              </li>
+            </ul>
+          </div>
+
+          <p v-if="auditReport.ai_summary.error_message" class="audit-error-note">
+            Fallback reason: {{ auditReport.ai_summary.error_message }}
+          </p>
+        </article>
+
+        <article class="audit-card audit-findings-card">
+          <h3>Structured Findings</h3>
+
+          <ul class="audit-findings-list">
+            <li
+              v-for="finding in auditReport.findings"
+              :key="`${finding.issue_code}-${finding.hardware_id}-${finding.message}`"
+              class="audit-finding-item"
+            >
+              <div class="audit-finding-topline">
+                <span
+                  class="audit-severity-badge"
+                  :class="`severity-${finding.severity}`"
+                >
+                  {{ finding.severity }}
+                </span>
+
+                <strong>{{ finding.issue_code }}</strong>
+              </div>
+
+              <p class="audit-finding-title">
+                {{ finding.hardware_name || "Inventory-level finding" }}
+                <span v-if="finding.hardware_id !== null">
+                  (ID {{ finding.hardware_id }})
+                </span>
+              </p>
+
+              <p class="audit-finding-message">
+                {{ finding.message }}
+              </p>
+            </li>
+          </ul>
+        </article>
+      </div>
     </section>
 
     <section class="panel">

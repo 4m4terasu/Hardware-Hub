@@ -12,9 +12,11 @@ from backend.app.models.user import User
 from backend.app.schemas.hardware import (
     HardwareListItem,
     InventoryAuditFinding,
+    InventoryAuditReportResponse,
     InventoryAuditResponse,
     InventoryAuditSummary,
 )
+from backend.app.services.gemini_audit_service import summarize_inventory_audit
 
 router = APIRouter(
     prefix="/api/hardware",
@@ -229,6 +231,24 @@ def build_audit_findings(hardware_items: list[Hardware]) -> list[InventoryAuditF
     return findings
 
 
+def build_inventory_audit_response(
+    hardware_items: list[Hardware],
+) -> InventoryAuditResponse:
+    findings = build_audit_findings(hardware_items)
+
+    summary = InventoryAuditSummary(
+        total_items=len(hardware_items),
+        total_findings=len(findings),
+        high_severity_count=sum(1 for finding in findings if finding.severity == "high"),
+        medium_severity_count=sum(
+            1 for finding in findings if finding.severity == "medium"
+        ),
+        low_severity_count=sum(1 for finding in findings if finding.severity == "low"),
+    )
+
+    return InventoryAuditResponse(summary=summary, findings=findings)
+
+
 @router.get("", response_model=list[HardwareListItem])
 def list_hardware(
     status: str | None = Query(default=None),
@@ -258,19 +278,25 @@ def audit_hardware_inventory(
     db: Session = Depends(get_db),
 ) -> InventoryAuditResponse:
     hardware_items = list(db.scalars(select(Hardware).order_by(Hardware.id)).all())
-    findings = build_audit_findings(hardware_items)
+    return build_inventory_audit_response(hardware_items)
 
-    summary = InventoryAuditSummary(
-        total_items=len(hardware_items),
-        total_findings=len(findings),
-        high_severity_count=sum(1 for finding in findings if finding.severity == "high"),
-        medium_severity_count=sum(
-            1 for finding in findings if finding.severity == "medium"
-        ),
-        low_severity_count=sum(1 for finding in findings if finding.severity == "low"),
+
+@router.get("/audit/report", response_model=InventoryAuditReportResponse)
+def audit_hardware_inventory_report(
+    db: Session = Depends(get_db),
+) -> InventoryAuditReportResponse:
+    hardware_items = list(db.scalars(select(Hardware).order_by(Hardware.id)).all())
+    deterministic_audit = build_inventory_audit_response(hardware_items)
+    ai_summary = summarize_inventory_audit(
+        deterministic_audit.summary,
+        deterministic_audit.findings,
     )
 
-    return InventoryAuditResponse(summary=summary, findings=findings)
+    return InventoryAuditReportResponse(
+        summary=deterministic_audit.summary,
+        findings=deterministic_audit.findings,
+        ai_summary=ai_summary,
+    )
 
 
 @router.post("/{hardware_id}/rent", response_model=HardwareListItem)

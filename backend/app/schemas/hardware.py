@@ -45,3 +45,19 @@ class InventoryAuditSummary(BaseModel):
 class InventoryAuditResponse(BaseModel):
     summary: InventoryAuditSummary
     findings: list[InventoryAuditFinding]
+
+
+class InventoryAuditAiSummary(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    fallback_used: bool
+    risk_level: Literal["high", "medium", "low"]
+    summary_text: str
+    priority_actions: list[str]
+    error_message: str | None = None
+
+
+class InventoryAuditReportResponse(BaseModel):
+    summary: InventoryAuditSummary
+    findings: list[InventoryAuditFinding]
+    ai_summary: InventoryAuditAiSummary
