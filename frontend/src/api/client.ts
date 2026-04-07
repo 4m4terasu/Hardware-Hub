@@ -33,6 +33,8 @@ export type CreateHardwareRequest = {
   history_text?: string | null;
 };
 
+export type UpdateHardwareRequest = CreateHardwareRequest;
+
 export type HardwareListItem = {
   id: number;
   name: string;
@@ -102,6 +104,18 @@ function normalizeOptionalText(value: string | null | undefined): string | null 
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeHardwarePayload(
+  payload: CreateHardwareRequest | UpdateHardwareRequest,
+): CreateHardwareRequest {
+  return {
+    name: payload.name.trim(),
+    brand: normalizeOptionalText(payload.brand),
+    purchase_date_raw: normalizeOptionalText(payload.purchase_date_raw),
+    notes: normalizeOptionalText(payload.notes),
+    history_text: normalizeOptionalText(payload.history_text),
+  };
 }
 
 async function readErrorMessage(
@@ -223,13 +237,7 @@ export async function createAdminUser(
 export async function createAdminHardware(
   payload: CreateHardwareRequest,
 ): Promise<HardwareListItem> {
-  const normalizedPayload: CreateHardwareRequest = {
-    name: payload.name.trim(),
-    brand: normalizeOptionalText(payload.brand),
-    purchase_date_raw: normalizeOptionalText(payload.purchase_date_raw),
-    notes: normalizeOptionalText(payload.notes),
-    history_text: normalizeOptionalText(payload.history_text),
-  };
+  const normalizedPayload = normalizeHardwarePayload(payload);
 
   const response = await apiFetch("/api/admin/hardware", {
     method: "POST",
@@ -239,6 +247,26 @@ export async function createAdminHardware(
   if (!response.ok) {
     throw new Error(
       await readErrorMessage(response, "Failed to create hardware item."),
+    );
+  }
+
+  return response.json() as Promise<HardwareListItem>;
+}
+
+export async function updateAdminHardware(
+  hardwareId: number,
+  payload: UpdateHardwareRequest,
+): Promise<HardwareListItem> {
+  const normalizedPayload = normalizeHardwarePayload(payload);
+
+  const response = await apiFetch(`/api/admin/hardware/${hardwareId}`, {
+    method: "PUT",
+    body: JSON.stringify(normalizedPayload),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      await readErrorMessage(response, "Failed to update hardware item."),
     );
   }
 

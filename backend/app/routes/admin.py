@@ -7,7 +7,11 @@ from backend.app.dependencies.auth import get_current_admin_user
 from backend.app.models.hardware import Hardware
 from backend.app.models.user import User
 from backend.app.schemas.auth import UserCreateRequest, UserRead
-from backend.app.schemas.hardware import HardwareCreateRequest, HardwareListItem
+from backend.app.schemas.hardware import (
+    HardwareCreateRequest,
+    HardwareListItem,
+    HardwareUpdateRequest,
+)
 from backend.app.utils.security import get_password_hash
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -73,6 +77,27 @@ def create_hardware(
     )
 
     db.add(hardware)
+    db.commit()
+    db.refresh(hardware)
+
+    return hardware
+
+
+@router.put("/hardware/{hardware_id}", response_model=HardwareListItem)
+def update_hardware(
+    hardware_id: int,
+    payload: HardwareUpdateRequest,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin_user),
+) -> Hardware:
+    hardware = get_hardware_or_404(hardware_id, db)
+
+    hardware.name = payload.name
+    hardware.brand = payload.brand
+    hardware.purchase_date_raw = payload.purchase_date_raw
+    hardware.notes = payload.notes
+    hardware.history_text = payload.history_text
+
     db.commit()
     db.refresh(hardware)
 

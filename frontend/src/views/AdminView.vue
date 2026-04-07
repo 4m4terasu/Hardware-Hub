@@ -11,6 +11,7 @@ import {
   getHardware,
   getInventoryAuditReport,
   toggleAdminRepairStatus,
+  updateAdminHardware,
   type AuthUser,
   type HardwareListItem,
   type InventoryAuditReport,
@@ -25,9 +26,10 @@ const auditReport = ref<InventoryAuditReport | null>(null);
 const isCheckingAccess = ref(true);
 const isLoadingHardware = ref(false);
 const isCreatingUser = ref(false);
-const isCreatingHardware = ref(false);
+const isSavingHardware = ref(false);
 const isLoadingAudit = ref(false);
 const activeHardwareActionId = ref<number | null>(null);
+const editingHardwareId = ref<number | null>(null);
 
 const successMessage = ref("");
 const errorMessage = ref("");
@@ -68,6 +70,23 @@ function resetHardwareForm() {
   hardwarePurchaseDateRaw.value = "";
   hardwareNotes.value = "";
   hardwareHistoryText.value = "";
+}
+
+function startEditingHardware(item: HardwareListItem) {
+  clearMessages();
+  editingHardwareId.value = item.id;
+  hardwareName.value = item.name;
+  hardwareBrand.value = item.brand ?? "";
+  hardwarePurchaseDateRaw.value = item.purchase_date_raw ?? "";
+  hardwareNotes.value = item.notes ?? "";
+  hardwareHistoryText.value = item.history_text ?? "";
+  void scrollToTopForFeedback();
+}
+
+function cancelEditingHardware() {
+  editingHardwareId.value = null;
+  resetHardwareForm();
+  clearMessages();
 }
 
 function getStatusClass(status: string | null): string {
@@ -127,6 +146,18 @@ async function loadHardware() {
   }
 }
 
+async function refreshAuditIfVisible() {
+  if (!auditReport.value) {
+    return;
+  }
+
+  try {
+    auditReport.value = await getInventoryAuditReport();
+  } catch {
+    // keep existing report if silent refresh fails
+  }
+}
+
 async function initializeAdminView() {
   try {
     const user = await getCurrentUser();
@@ -171,7 +202,7 @@ async function handleCreateUser() {
 
 async function handleCreateHardware() {
   clearMessages();
-  isCreatingHardware.value = true;
+  isSavingHardware.value = true;
 
   try {
     const createdHardware = await createAdminHardware({
@@ -185,14 +216,56 @@ async function handleCreateHardware() {
     successMessage.value = `Hardware created: ${createdHardware.name} (ID ${createdHardware.id})`;
     resetHardwareForm();
     await loadHardware();
+    await refreshAuditIfVisible();
     await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to create hardware.";
     await scrollToTopForFeedback();
   } finally {
-    isCreatingHardware.value = false;
+    isSavingHardware.value = false;
   }
+}
+
+async function handleUpdateHardware() {
+  if (editingHardwareId.value === null) {
+    return;
+  }
+
+  clearMessages();
+  isSavingHardware.value = true;
+
+  try {
+    const updatedHardware = await updateAdminHardware(editingHardwareId.value, {
+      name: hardwareName.value,
+      brand: hardwareBrand.value,
+      purchase_date_raw: hardwarePurchaseDateRaw.value,
+      notes: hardwareNotes.value,
+      history_text: hardwareHistoryText.value,
+    });
+
+    successMessage.value = `Hardware updated: ${updatedHardware.name} (ID ${updatedHardware.id})`;
+    editingHardwareId.value = null;
+    resetHardwareForm();
+    await loadHardware();
+    await refreshAuditIfVisible();
+    await scrollToTopForFeedback();
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to update hardware.";
+    await scrollToTopForFeedback();
+  } finally {
+    isSavingHardware.value = false;
+  }
+}
+
+async function handleSubmitHardware() {
+  if (editingHardwareId.value !== null) {
+    await handleUpdateHardware();
+    return;
+  }
+
+  await handleCreateHardware();
 }
 
 async function handleToggleRepair(item: HardwareListItem) {
@@ -203,6 +276,7 @@ async function handleToggleRepair(item: HardwareListItem) {
     const updatedItem = await toggleAdminRepairStatus(item.id);
     successMessage.value = `Repair status updated for item ${updatedItem.id}.`;
     await loadHardware();
+    await refreshAuditIfVisible();
     await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
@@ -229,8 +303,14 @@ async function handleDeleteHardware(item: HardwareListItem) {
 
   try {
     await deleteAdminHardware(item.id);
+
+    if (editingHardwareId.value === item.id) {
+      cancelEditingHardware();
+    }
+
     successMessage.value = `Hardware item ${item.id} deleted.`;
     await loadHardware();
+    await refreshAuditIfVisible();
     await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
@@ -244,6 +324,7 @@ async function handleDeleteHardware(item: HardwareListItem) {
 async function handleRefresh() {
   clearMessages();
   await loadHardware();
+  await refreshAuditIfVisible();
 }
 
 async function handleRunAudit() {
@@ -375,17 +456,23 @@ onMounted(() => {
       <article class="panel">
         <div class="panel-header">
           <div>
-            <h2>Add Hardware</h2>
-            <p class="muted">Create a new inventory item using the existing fields.</p>
+            <h2>{{ editingHardwareId !== null ? "Edit Hardware" : "Add Hardware" }}</h2>
+            <p class="muted">
+              {{
+                editingHardwareId !== null
+                  ? "Update an existing inventory item using the same fields."
+                  : "Create a new inventory item using the existing fields."
+              }}
+            </p>
           </div>
         </div>
 
-        <form class="stack" autocomplete="off" @submit.prevent="handleCreateHardware">
+        <form class="stack" autocomplete="off" @submit.prevent="handleSubmitHardware">
           <label class="form-field">
             <span>Name</span>
             <input
               v-model="hardwareName"
-              name="admin-create-hardware-name"
+              name="admin-hardware-name"
               type="text"
               placeholder="MacBook Pro 14"
               autocomplete="off"
@@ -397,7 +484,7 @@ onMounted(() => {
             <span>Brand</span>
             <input
               v-model="hardwareBrand"
-              name="admin-create-hardware-brand"
+              name="admin-hardware-brand"
               type="text"
               placeholder="Apple"
               autocomplete="off"
@@ -408,8 +495,9 @@ onMounted(() => {
             <span>Purchase Date</span>
             <input
               v-model="hardwarePurchaseDateRaw"
-              name="admin-create-hardware-date"
-              type="date"
+              name="admin-hardware-date"
+              type="text"
+              placeholder="YYYY-MM-DD or raw source value"
               autocomplete="off"
             />
           </label>
@@ -418,7 +506,7 @@ onMounted(() => {
             <span>Notes</span>
             <textarea
               v-model="hardwareNotes"
-              name="admin-create-hardware-notes"
+              name="admin-hardware-notes"
               placeholder="Optional notes for admins"
               autocomplete="off"
             />
@@ -428,15 +516,35 @@ onMounted(() => {
             <span>History</span>
             <textarea
               v-model="hardwareHistoryText"
-              name="admin-create-hardware-history"
+              name="admin-hardware-history"
               placeholder="Optional history or context"
               autocomplete="off"
             />
           </label>
 
-          <button type="submit" :disabled="isCreatingHardware">
-            {{ isCreatingHardware ? "Adding hardware..." : "Add Hardware" }}
-          </button>
+          <div class="form-actions">
+            <button type="submit" :disabled="isSavingHardware">
+              {{
+                isSavingHardware
+                  ? editingHardwareId !== null
+                    ? "Saving..."
+                    : "Adding hardware..."
+                  : editingHardwareId !== null
+                    ? "Save Changes"
+                    : "Add Hardware"
+              }}
+            </button>
+
+            <button
+              v-if="editingHardwareId !== null"
+              type="button"
+              class="secondary-button"
+              :disabled="isSavingHardware"
+              @click="cancelEditingHardware"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       </article>
     </section>
@@ -576,7 +684,7 @@ onMounted(() => {
         <div>
           <h2>Hardware Inventory</h2>
           <p class="muted">
-            Review inventory state and manage repair / delete actions.
+            Review inventory state and manage repair / edit / delete actions.
           </p>
         </div>
       </div>
@@ -613,6 +721,15 @@ onMounted(() => {
               <td>{{ item.notes || "—" }}</td>
               <td>
                 <div class="table-actions">
+                  <button
+                    type="button"
+                    class="secondary-button"
+                    :disabled="activeHardwareActionId === item.id"
+                    @click="startEditingHardware(item)"
+                  >
+                    {{ editingHardwareId === item.id ? "Editing..." : "Edit" }}
+                  </button>
+
                   <button
                     type="button"
                     class="secondary-button"

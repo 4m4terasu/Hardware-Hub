@@ -26,6 +26,10 @@ class HardwareCreateRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
+class HardwareUpdateRequest(HardwareCreateRequest):
+    pass
+
+
 class InventoryAuditFinding(BaseModel):
     hardware_id: int | None = None
     hardware_name: str | None = None
