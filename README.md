@@ -51,12 +51,15 @@ The project was intentionally built as a practical, interview-defensible MVP: st
 - Admin Command Center
   - create users
   - add hardware
+  - edit hardware
   - delete hardware
   - toggle repair status
 - Smart dashboard
   - list hardware
   - filter by status and brand
   - sort by multiple fields
+  - app-shell style navigation with sidebar
+  - dedicated My Rentals page
 - Rental engine
   - rent available hardware
   - return hardware assigned to the current user
@@ -234,6 +237,7 @@ backend/
 frontend/
   src/
     api/
+    components/
     router/
     views/
   vercel.json
@@ -260,6 +264,7 @@ docs/
 * create standard users
 * create admin users
 * create hardware items
+* edit hardware items
 * delete hardware items
 * toggle repair status
 * auto-scroll to feedback banner after admin actions
@@ -270,6 +275,8 @@ docs/
 * status filter
 * brand filter
 * sorting by id, name, brand, purchase date, and status
+* sidebar-based app shell navigation
+* dedicated My Rentals view
 * visible admin link only for admins
 * auto-scroll to feedback banner after rent / return actions
 
@@ -294,6 +301,7 @@ docs/
 * backend deployed on Railway
 * persistent SQLite storage configured on Railway volume
 * critical flows manually verified in production
+* live UI includes sidebar navigation, My Rentals view, and admin hardware edit flow
 
 ## ⚡ Shortcuts and Trade-offs
 
