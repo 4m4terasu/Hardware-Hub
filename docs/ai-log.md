@@ -77,6 +77,12 @@ That mattered most in:
 - UI bug fixes
 - Gemini structured output and fallback behavior
 
+## Prompt Trail
+
+The prompt history that shaped the architecture, implementation flow, and deployment is documented in:
+
+- `docs/prompt-trail.md`
+
 ## Final Reflection
 
 The biggest value AI provided here was not just speed. It was helping me work in a structured, reviewable way:

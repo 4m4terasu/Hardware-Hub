@@ -80,3 +80,24 @@ This was a cross-verification moment: one model surfaced a framework-quality iss
 
 ### Commentary
 This shows that I was testing the product myself and caught a UX issue the AI did not anticipate. I also identified the specific fix — and directed the AI to apply it correctly rather than asking for a rewrite.
+
+---
+
+## Prompt 5 — Deployment and environment wiring
+
+### Prompt
+> I want the realistic deployment path for this stack:
+> - backend: Python + FastAPI + SQLite
+> - frontend: Vue 3 + Vite + TypeScript
+>
+> Requirements:
+> - backend and frontend must be reachable via public URLs
+> - bootstrap admin seed must run on first startup
+> - environment variables must be configurable on the deployment platform
+> - SQLite is acceptable for this MVP deployment
+> - frontend must point to the deployed backend URL, not localhost
+>
+> Give me the safest step-by-step deployment path without changing the stack.
+
+### Commentary
+This prompt shows that I used AI not only for coding, but also for deployment planning and configuration control. I kept the stack aligned with the assignment, preserved SQLite for the MVP, and used AI to help sequence Railway and Vercel setup without changing the product architecture late in the process.
