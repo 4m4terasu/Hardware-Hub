@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import AppShell from "../components/AppShell.vue";
 import {
   clearAccessToken,
   getCurrentUser,
@@ -53,6 +54,13 @@ async function scrollToTopForFeedback() {
   });
 }
 
+function getStatusClass(status: string | null): string {
+  if (status === "Available") return "status-available";
+  if (status === "In Use") return "status-in-use";
+  if (status === "Repair") return "status-repair";
+  return "status-unknown";
+}
+
 function isAuthErrorMessage(message: string): boolean {
   const normalizedMessage = message.toLowerCase();
 
@@ -103,11 +111,6 @@ async function initializeDashboard() {
   } catch {
     await handleUnauthorized();
   }
-}
-
-async function handleLogout() {
-  clearAccessToken();
-  await router.push("/login");
 }
 
 function canRentItem(item: HardwareListItem): boolean {
@@ -191,23 +194,24 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Dashboard</p>
-        <h1>Hardware Hub</h1>
-        <p v-if="currentUser" class="muted">
-          Signed in as {{ currentUser.email }}
-        </p>
-      </div>
+  <main v-if="isLoading && !currentUser" class="screen">
+    <section class="card">
+      <p class="state-text">Loading inventory...</p>
+    </section>
+  </main>
 
-      <nav class="nav">
-        <RouterLink v-if="currentUser?.is_admin" to="/admin">Admin</RouterLink>
-        <button type="button" class="nav-button" @click="handleLogout">
-          Logout
-        </button>
-      </nav>
-    </header>
+  <AppShell
+    v-else-if="currentUser"
+    title="Hardware List"
+    subtitle="Browse available gear, filter the inventory, and rent devices."
+    :current-user-email="currentUser.email"
+    :is-admin="currentUser.is_admin"
+  >
+    <template #actions>
+      <button type="button" class="secondary-button" @click="handleRefresh">
+        Refresh
+      </button>
+    </template>
 
     <p v-if="successMessage" class="feedback-banner feedback-success">
       {{ successMessage }}
@@ -218,19 +222,6 @@ onMounted(() => {
     </p>
 
     <section class="panel">
-      <div class="panel-header">
-        <div>
-          <h2>Inventory</h2>
-          <p class="muted">
-            Browse available gear and rent or return items from the dashboard.
-          </p>
-        </div>
-
-        <button type="button" class="secondary-button" @click="handleRefresh">
-          Refresh
-        </button>
-      </div>
-
       <div class="controls-row">
         <label class="control-field">
           <span>Status</span>
@@ -292,7 +283,11 @@ onMounted(() => {
               <td>{{ item.name }}</td>
               <td>{{ item.brand || "—" }}</td>
               <td>{{ item.purchase_date_raw || "—" }}</td>
-              <td>{{ item.status_raw || "—" }}</td>
+              <td>
+                <span class="status-pill" :class="getStatusClass(item.status_raw)">
+                  {{ item.status_raw || "—" }}
+                </span>
+              </td>
               <td>{{ item.assigned_to || "—" }}</td>
               <td>
                 <div class="table-actions">
@@ -323,5 +318,5 @@ onMounted(() => {
         </table>
       </div>
     </section>
-  </main>
+  </AppShell>
 </template>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";import { useRouter } from "vue-router";
+import { nextTick, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import AppShell from "../components/AppShell.vue";
 import {
   clearAccessToken,
   createAdminHardware,
@@ -66,6 +68,22 @@ function resetHardwareForm() {
   hardwarePurchaseDateRaw.value = "";
   hardwareNotes.value = "";
   hardwareHistoryText.value = "";
+}
+
+function getStatusClass(status: string | null): string {
+  if (status === "Available") {
+    return "status-available";
+  }
+
+  if (status === "In Use") {
+    return "status-in-use";
+  }
+
+  if (status === "Repair") {
+    return "status-repair";
+  }
+
+  return "status-unknown";
 }
 
 async function handleUnauthorized() {
@@ -261,11 +279,6 @@ async function handleRunAudit() {
   }
 }
 
-async function handleLogout() {
-  clearAccessToken();
-  await router.push("/login");
-}
-
 function getRepairButtonLabel(item: HardwareListItem): string {
   if (item.status_raw === "Repair") {
     return "Mark Available";
@@ -280,29 +293,29 @@ onMounted(() => {
 </script>
 
 <template>
-  <main v-if="isCheckingAccess" class="shell">
-    <section class="panel">
+  <main v-if="isCheckingAccess" class="screen">
+    <section class="card">
       <p class="state-text">Checking admin access...</p>
     </section>
   </main>
 
-  <main v-else-if="currentUser" class="shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Admin Command Center</p>
-        <h1>Admin Panel</h1>
-        <p class="muted">
-          Signed in as {{ currentUser.email }}
-        </p>
-      </div>
-
-      <nav class="nav">
-        <RouterLink to="/dashboard">Dashboard</RouterLink>
-        <button type="button" class="nav-button" @click="handleLogout">
-          Logout
-        </button>
-      </nav>
-    </header>
+  <AppShell
+    v-else-if="currentUser"
+    title="Hardware Management"
+    subtitle="Manage users, inventory state, and audit output."
+    :current-user-email="currentUser.email"
+    :is-admin="currentUser.is_admin"
+  >
+    <template #actions>
+      <button
+        type="button"
+        class="secondary-button"
+        :disabled="isLoadingHardware"
+        @click="handleRefresh"
+      >
+        {{ isLoadingHardware ? "Refreshing..." : "Refresh" }}
+      </button>
+    </template>
 
     <p v-if="successMessage" class="feedback-banner feedback-success">
       {{ successMessage }}
@@ -363,7 +376,7 @@ onMounted(() => {
         <div class="panel-header">
           <div>
             <h2>Add Hardware</h2>
-            <p class="muted">Create a new inventory item with raw-friendly fields.</p>
+            <p class="muted">Create a new inventory item using the existing fields.</p>
           </div>
         </div>
 
@@ -561,20 +574,11 @@ onMounted(() => {
     <section class="panel">
       <div class="panel-header">
         <div>
-          <h2>Admin Hardware Inventory</h2>
+          <h2>Hardware Inventory</h2>
           <p class="muted">
-            Toggle repair status, review metadata, and delete old items.
+            Review inventory state and manage repair / delete actions.
           </p>
         </div>
-
-        <button
-          type="button"
-          class="secondary-button"
-          :disabled="isLoadingHardware"
-          @click="handleRefresh"
-        >
-          {{ isLoadingHardware ? "Refreshing..." : "Refresh" }}
-        </button>
       </div>
 
       <p v-if="isLoadingHardware" class="state-text">Loading hardware...</p>
@@ -600,7 +604,11 @@ onMounted(() => {
               <td>{{ item.name }}</td>
               <td>{{ item.brand || "—" }}</td>
               <td>{{ item.purchase_date_raw || "—" }}</td>
-              <td>{{ item.status_raw || "—" }}</td>
+              <td>
+                <span class="status-pill" :class="getStatusClass(item.status_raw)">
+                  {{ item.status_raw || "—" }}
+                </span>
+              </td>
               <td>{{ item.assigned_to || "—" }}</td>
               <td>{{ item.notes || "—" }}</td>
               <td>
@@ -637,5 +645,5 @@ onMounted(() => {
         </table>
       </div>
     </section>
-  </main>
+  </AppShell>
 </template>

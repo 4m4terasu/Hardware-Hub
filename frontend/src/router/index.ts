@@ -3,6 +3,7 @@ import { getAccessToken } from "../api/client";
 import LoginView from "../views/LoginView.vue";
 import DashboardView from "../views/DashboardView.vue";
 import AdminView from "../views/AdminView.vue";
+import MyRentalsView from "../views/MyRentalsView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,13 +11,17 @@ const router = createRouter({
     { path: "/", redirect: "/login" },
     { path: "/login", name: "login", component: LoginView },
     { path: "/dashboard", name: "dashboard", component: DashboardView },
+    { path: "/my-rentals", name: "my-rentals", component: MyRentalsView },
     { path: "/admin", name: "admin", component: AdminView },
   ],
 });
 
 router.beforeEach((to) => {
   const token = getAccessToken();
-  const requiresAuth = to.name === "dashboard" || to.name === "admin";
+  const requiresAuth =
+    to.name === "dashboard" ||
+    to.name === "my-rentals" ||
+    to.name === "admin";
 
   if (requiresAuth && !token) {
     return { name: "login" };
