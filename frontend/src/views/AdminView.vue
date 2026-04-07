@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { nextTick, onMounted, ref } from "vue";import { useRouter } from "vue-router";
 import {
   clearAccessToken,
   createAdminHardware,
@@ -44,6 +43,15 @@ const hardwareHistoryText = ref("");
 function clearMessages() {
   successMessage.value = "";
   errorMessage.value = "";
+}
+
+async function scrollToTopForFeedback() {
+  await nextTick();
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
 }
 
 function resetUserForm() {
@@ -133,9 +141,11 @@ async function handleCreateUser() {
 
     successMessage.value = `User created: ${createdUser.email}`;
     resetUserForm();
+    await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to create user.";
+    await scrollToTopForFeedback();
   } finally {
     isCreatingUser.value = false;
   }
@@ -157,9 +167,11 @@ async function handleCreateHardware() {
     successMessage.value = `Hardware created: ${createdHardware.name} (ID ${createdHardware.id})`;
     resetHardwareForm();
     await loadHardware();
+    await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to create hardware.";
+    await scrollToTopForFeedback();
   } finally {
     isCreatingHardware.value = false;
   }
@@ -173,11 +185,13 @@ async function handleToggleRepair(item: HardwareListItem) {
     const updatedItem = await toggleAdminRepairStatus(item.id);
     successMessage.value = `Repair status updated for item ${updatedItem.id}.`;
     await loadHardware();
+    await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
       error instanceof Error
         ? error.message
         : "Failed to toggle repair status.";
+    await scrollToTopForFeedback();
   } finally {
     activeHardwareActionId.value = null;
   }
@@ -199,9 +213,11 @@ async function handleDeleteHardware(item: HardwareListItem) {
     await deleteAdminHardware(item.id);
     successMessage.value = `Hardware item ${item.id} deleted.`;
     await loadHardware();
+    await scrollToTopForFeedback();
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to delete hardware.";
+    await scrollToTopForFeedback();
   } finally {
     activeHardwareActionId.value = null;
   }
@@ -225,6 +241,8 @@ async function handleRunAudit() {
     } else {
       successMessage.value = "Inventory audit report generated successfully.";
     }
+
+    await scrollToTopForFeedback();
   } catch (error) {
     const message =
       error instanceof Error
@@ -237,6 +255,7 @@ async function handleRunAudit() {
     }
 
     errorMessage.value = message;
+    await scrollToTopForFeedback();
   } finally {
     isLoadingAudit.value = false;
   }
